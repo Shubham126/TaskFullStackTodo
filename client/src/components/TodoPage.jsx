@@ -7,7 +7,7 @@ const API_BASE = "http://localhost:5000/api";
 export default function TodoPage() {
   const { auth, logout } = useContext(AuthContext);
   const [todos, setTodos] = useState([]);
-  const [form, setForm] = useState({ title: "", description: "" });
+  const [form, setForm] = useState({ title: "", description: "", status: "pending" });
   const [editingTodo, setEditingTodo] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -48,8 +48,12 @@ export default function TodoPage() {
     const me = auth?.user;
     if (!me) return false;
     if (me.role === "admin") return true;
-    if (me.role === "manager" && getOwnerRole(todo) === "user") return true;
-    return String(getOwnerId(todo)) === String(me._id);
+    const isOwner = String(getOwnerId(todo)) === String(me._id);
+    if (me.role === "manager") {
+      if (isOwner) return true;
+      return getOwnerRole(todo) === "user";
+    }
+    return isOwner;
   };
 
   const canDelete = (todo) => {
@@ -60,7 +64,7 @@ export default function TodoPage() {
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "" });
+    setForm({ title: "", description: "", status: "pending" });
     setEditingTodo(null);
   };
 
@@ -68,6 +72,7 @@ export default function TodoPage() {
     e.preventDefault();
     const task = form.title?.trim();
     const description = form.description?.trim();
+    const status = form.status;
     if (!task || !description) {
       alert("Title and description are required");
       return;
@@ -79,12 +84,13 @@ export default function TodoPage() {
         const res = await axiosAuth.put(`/todos/${editingTodo._id}`, {
           task,
           description,
+          status,
         });
         setTodos((prev) =>
           prev.map((t) => (t._id === editingTodo._id ? res.data : t))
         );
       } else {
-        const res = await axiosAuth.post("/todos", { task, description });
+        const res = await axiosAuth.post("/todos", { task, description, status });
         setTodos((prev) => [res.data, ...prev]);
       }
       resetForm();
@@ -120,6 +126,7 @@ export default function TodoPage() {
     setForm({
       title: todo.task || todo.title || "",
       description: todo.description || "",
+      status: todo.status || "pending",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -141,7 +148,6 @@ export default function TodoPage() {
         </div>
       </div>
 
-      
       <form onSubmit={handleSubmit} className="mb-6 space-y-3">
         <input
           type="text"
@@ -157,6 +163,14 @@ export default function TodoPage() {
           className="border p-2 w-full rounded"
           rows={4}
         />
+        <select
+          value={form.status}
+          onChange={(e) => setForm({ ...form, status: e.target.value })}
+          className="border p-2 rounded"
+        >
+          <option value="pending">pending</option>
+          <option value="completed">completed</option>
+        </select>
         <div className="flex items-center gap-3">
           <button
             type="submit"
@@ -179,7 +193,6 @@ export default function TodoPage() {
         </div>
       </form>
 
-      
       <div className="space-y-4">
         {todos.map((todo) => {
           const createdAt = todo.createdAt ? new Date(todo.createdAt) : null;
@@ -191,6 +204,9 @@ export default function TodoPage() {
             todo.createdBy?.email ||
             "Unknown";
 
+          const showEdit = canEdit(todo);
+          const showDelete = canDelete(todo);
+
           return (
             <div
               key={todo._id}
@@ -200,6 +216,9 @@ export default function TodoPage() {
                 <div className="flex flex-wrap items-center gap-4">
                   <span className="font-bold">{titleText}</span>
                   <span className="font-bold">By: {creator}</span>
+                  <span className={`font-semibold ${todo.status === "completed" ? "text-green-600" : "text-yellow-700"}`}>
+                    Status: {todo.status || "pending"}
+                  </span>
                   <span>
                     {createdAt
                       ? `${createdAt.toLocaleDateString()} ${createdAt.toLocaleTimeString()}`
@@ -207,7 +226,7 @@ export default function TodoPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  {canEdit(todo) && (
+                  {showEdit && (
                     <button
                       onClick={() => startEdit(todo)}
                       className="text-blue-600 hover:underline"
@@ -215,7 +234,7 @@ export default function TodoPage() {
                       Edit
                     </button>
                   )}
-                  {canDelete(todo) && (
+                  {showDelete && (
                     <button
                       onClick={() => handleDelete(todo._id)}
                       className="text-red-600 hover:underline"
