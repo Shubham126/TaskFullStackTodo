@@ -7,6 +7,9 @@ const API_BASE = "http://localhost:5000/api";
 export default function TodoPage() {
   const { auth, logout } = useContext(AuthContext);
   const [todos, setTodos] = useState([]);
+  const [visible, setVisible] = useState([]); // filtered view
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedTerm, setDebouncedTerm] = useState("");
   const [form, setForm] = useState({ title: "", description: "", status: "pending" });
   const [editingTodo, setEditingTodo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -26,7 +29,9 @@ export default function TodoPage() {
     (async () => {
       try {
         const res = await axiosAuth.get("/todos");
-        setTodos(res.data || []);
+        const data = res.data || [];
+        setTodos(data);
+        setVisible(data);
       } catch (err) {
         console.error("Fetch todos error:", err);
         alert(
@@ -38,29 +43,71 @@ export default function TodoPage() {
     })();
   }, [auth?.token, axiosAuth]);
 
-  const getOwnerId = (todo) =>
-    todo.userId?._id || todo.createdBy?._id || todo.userId || todo.createdBy;
+  // Debounce searchTerm by 300ms
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTerm(searchTerm.trim().toLowerCase()), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
-  const getOwnerRole = (todo) =>
-    todo.userId?.role || todo.createdBy?.role || null;
+  // Apply filtering when debouncedTerm or todos change
+  useEffect(() => {
+    if (!debouncedTerm) {
+      setVisible(todos);
+      return;
+    }
+    const term = debouncedTerm;
+    const filtered = todos.filter((todo) => {
+      const title = (todo.task || todo.title || "").toLowerCase();
+      const description = (todo.description || "").toLowerCase();
+      const creator =
+        (todo.userId?.name ||
+          todo.createdBy?.name ||
+          todo.userId?.email ||
+          todo.createdBy?.email ||
+          "").toLowerCase();
+
+      return (
+        title.includes(term) ||
+        description.includes(term) ||
+        creator.includes(term)
+      );
+    });
+    setVisible(filtered);
+  }, [debouncedTerm, todos]);
+
+  const toIdString = (val) => {
+    if (!val) return "";
+    if (typeof val === "string") return val;
+    if (typeof val === "object" && val._id) return String(val._id);
+    try {
+      return String(val);
+    } catch {
+      return "";
+    }
+  };
+
+  const getOwnerId = (todo) => todo.userId ?? todo.createdBy;
+  const getOwnerRole = (todo) => todo.userId?.role || todo.createdBy?.role || null;
+
+  const isOwnerOf = (todo) =>
+    toIdString(getOwnerId(todo)) === toIdString(auth?.user?._id);
 
   const canEdit = (todo) => {
     const me = auth?.user;
     if (!me) return false;
     if (me.role === "admin") return true;
-    const isOwner = String(getOwnerId(todo)) === String(me._id);
     if (me.role === "manager") {
-      if (isOwner) return true;
+      if (isOwnerOf(todo)) return true;
       return getOwnerRole(todo) === "user";
     }
-    return isOwner;
+    return isOwnerOf(todo);
   };
 
   const canDelete = (todo) => {
     const me = auth?.user;
     if (!me) return false;
     if (me.role === "admin") return true;
-    return String(getOwnerId(todo)) === String(me._id);
+    return isOwnerOf(todo);
   };
 
   const resetForm = () => {
@@ -133,8 +180,17 @@ export default function TodoPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <h2 className="text-2xl font-bold">Your Todos</h2>
+        <div className="flex items-center gap-3 px-4 py-2 rounded">
+        <input
+          type="text"
+          value={searchTerm}
+          placeholder="Search"
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="border p-2 w-full rounded"
+        />
+        </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">
             {auth?.user?.name} ({auth?.user?.role})
@@ -147,6 +203,7 @@ export default function TodoPage() {
           </button>
         </div>
       </div>
+
 
       <form onSubmit={handleSubmit} className="mb-6 space-y-3">
         <input
@@ -194,7 +251,7 @@ export default function TodoPage() {
       </form>
 
       <div className="space-y-4">
-        {todos.map((todo) => {
+        {visible.map((todo) => {
           const createdAt = todo.createdAt ? new Date(todo.createdAt) : null;
           const titleText = todo.task || todo.title || "Untitled";
           const creator =
@@ -216,7 +273,11 @@ export default function TodoPage() {
                 <div className="flex flex-wrap items-center gap-4">
                   <span className="font-bold">{titleText}</span>
                   <span className="font-bold">By: {creator}</span>
-                  <span className={`font-semibold ${todo.status === "completed" ? "text-green-600" : "text-yellow-700"}`}>
+                  <span
+                    className={`font-semibold ${
+                      todo.status === "completed" ? "text-green-600" : "text-yellow-700"
+                    }`}
+                  >
                     Status: {todo.status || "pending"}
                   </span>
                   <span>
@@ -250,8 +311,9 @@ export default function TodoPage() {
             </div>
           );
         })}
-        {todos.length === 0 && (
-          <div className="text-center text-gray-500">No todos yet.</div>
+
+        {visible.length === 0 && (
+          <div className="text-center text-gray-500">No matching todos.</div>
         )}
       </div>
     </div>
