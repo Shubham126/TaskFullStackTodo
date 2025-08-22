@@ -4,7 +4,6 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 
 import authRoutes from "./routes/authRoutes.js";
-import employeeRoutes from "./routes/employeeRoutes.js";
 import todoRoutes from "./routes/todoRoutes.js";
 
 dotenv.config();
@@ -19,7 +18,6 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-app.use("/api/employees", employeeRoutes);
 app.use("/api/todos", todoRoutes);
 
 const PORT = process.env.PORT || 5000;
