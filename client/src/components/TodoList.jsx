@@ -1,6 +1,6 @@
 // src/components/TodoList.jsx
 import { useEffect, useState } from "react";
-import API from "../api"; // should be axios instance with baseURL: http://localhost:5000/api
+import API from "../api";
 
 export default function TodoList() {
   const [todos, setTodos] = useState([]);

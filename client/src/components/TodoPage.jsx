@@ -1,4 +1,3 @@
-// src/components/TodoPage.jsx
 import { useContext, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
@@ -22,7 +21,6 @@ export default function TodoPage() {
     });
   }, [auth?.token]);
 
-  // Load todos
   useEffect(() => {
     if (!auth?.token) return;
     (async () => {
@@ -40,9 +38,7 @@ export default function TodoPage() {
     })();
   }, [auth?.token, axiosAuth]);
 
-  // Helpers for permissions (frontend checks; keep enforcing on backend too)
   const getOwnerId = (todo) =>
-    // support both shapes, populated or not
     todo.userId?._id || todo.createdBy?._id || todo.userId || todo.createdBy;
 
   const getOwnerRole = (todo) =>
@@ -80,7 +76,6 @@ export default function TodoPage() {
     try {
       setLoading(true);
       if (editingTodo) {
-        // PUT /api/todos/:id
         const res = await axiosAuth.put(`/todos/${editingTodo._id}`, {
           task,
           description,
@@ -89,7 +84,6 @@ export default function TodoPage() {
           prev.map((t) => (t._id === editingTodo._id ? res.data : t))
         );
       } else {
-        // POST /api/todos
         const res = await axiosAuth.post("/todos", { task, description });
         setTodos((prev) => [res.data, ...prev]);
       }
@@ -147,7 +141,7 @@ export default function TodoPage() {
         </div>
       </div>
 
-      {/* Add / Edit Form */}
+      
       <form onSubmit={handleSubmit} className="mb-6 space-y-3">
         <input
           type="text"
@@ -185,7 +179,7 @@ export default function TodoPage() {
         </div>
       </form>
 
-      {/* Todo Cards */}
+      
       <div className="space-y-4">
         {todos.map((todo) => {
           const createdAt = todo.createdAt ? new Date(todo.createdAt) : null;
