@@ -64,15 +64,19 @@ export const updateTodo = async (req, res) => {
     const me = req.user;
     const existing = await Todo.findById(req.params.id).populate(POPULATE_USER);
     if (!existing) return res.status(404).json({ message: "Todo not found" });
-    const ownerId = String(existing.userId?._id || existing.userId);
-    const isOwner = ownerId === String(me._id);
+
+    // Ensure both IDs are compared as strings for reliability
+    const ownerId = (existing.userId._id || existing.userId).toString();
+    const isOwner = ownerId === me._id.toString();
     const isAdmin = me.role === "admin";
     const isManager = me.role === "manager";
     const targetIsUser = existing.userId?.role === "user";
     const allowed = isAdmin || isOwner || (isManager && (isOwner || targetIsUser));
+
     if (!allowed) {
       return res.status(403).json({ message: "Not allowed to edit this todo" });
     }
+
     const updates = {};
     if (typeof req.body.task === "string") updates.task = req.body.task.trim();
     if (typeof req.body.description === "string") updates.description = req.body.description.trim();
@@ -89,10 +93,13 @@ export const deleteTodo = async (req, res) => {
     const me = req.user;
     const existing = await Todo.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Todo not found" });
-    const ownerId = String(existing.userId);
-    const isOwner = ownerId === String(me._id);
+
+    // Ensure both IDs are compared as strings for reliability
+    const ownerId = (existing.userId._id || existing.userId).toString ? (existing.userId._id || existing.userId).toString() : String(existing.userId._id || existing.userId);
+    const isOwner = ownerId === me._id.toString();
     const isAdmin = me.role === "admin";
     const allowed = isAdmin || isOwner;
+
     if (!allowed) {
       return res.status(403).json({ message: "Not allowed to delete this todo" });
     }
